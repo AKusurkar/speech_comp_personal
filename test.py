@@ -99,13 +99,25 @@ with open("/home/epochvipc1/Documents/Speech_comp_temp/data/train_word_transcrip
 #     for item in comb:
 #         f.write(json.dumps(item) + "\n")
 
-import glob
+# import glob
 
-files = glob.glob("/home/epochvipc1/Documents/Speech_comp_temp/data/audio" + "/*.flac")
-filenames = [i.split('/')[-1].split('.')[0] for i in files]
+# files = glob.glob("/home/epochvipc1/Documents/Speech_comp_temp/data/audio" + "/*.flac")
+# filenames = [i.split('/')[-1].split('.')[0] for i in files]
 
-for i in new:
+# for i in new:
 
-    if i['utterance_id'] not in filenames:
-        print(i)
+#     if i['utterance_id'] not in filenames:
+#         print(i)
 
+# m = 0
+
+# for o in original:
+
+#     if o["audio_duration_sec"] > 60:
+
+#         m += 1
+#         print(o["audio_duration_sec"])
+
+# print(m)
+import torch
+print(torch.cuda.is_bf16_supported())

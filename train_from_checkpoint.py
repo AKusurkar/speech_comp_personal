@@ -4,19 +4,18 @@ from omegaconf import OmegaConf
 from lightning.pytorch.loggers import TensorBoardLogger
 from lightning.pytorch.callbacks import ModelCheckpoint
 from adapter import AdapterLayer
-from custom_params_override import custom_params
-import types
+import torch
 
 # Setup
 
 logger_path = "/home/epochvipc1/Documents/Speech_comp_temp/tb_logs"
-logger_name = "parakeet_custom_adapter_differential"
-checkpoint_path = "/home/epochvipc1/Documents/Speech_comp_temp/model_checkpoints/custom_adapter_differential"
-model_path = "/home/epochvipc1/Documents/speech_comp_pieter/childrens-speech-recognition-runtime/src/assets/parakeet-tdt-0.6b-v2/parakeet-tdt-0.6b-v2.nemo"
+logger_name = "parakeet_custom_adapter_combined_logs"
+checkpoint_path = "/home/epochvipc1/Documents/Speech_comp_temp/model_checkpoints/custom_model_adapter"
+ckpt_path = "/home/epochvipc1/Documents/Speech_comp_temp/updated_ckpt/epcoh_6.ckpt"
 train_path = "/home/epochvipc1/Documents/Speech_comp_temp/dicts_combined/train_data_comb_nemo.jsonl"
 val_path = "/home/epochvipc1/Documents/Speech_comp_temp/dicts_combined/val_data_comb_nemo.jsonl"
 model_out = "/home/epochvipc1/Documents/Speech_comp_temp/models"
-max_epochs = 50
+max_epochs = 20
 num_gpus = 2
 batch_size = 1
 adapter_dim = 128
@@ -29,7 +28,7 @@ tb_logger = TensorBoardLogger(
 checkpoint = ModelCheckpoint(
 
     dirpath=checkpoint_path,
-    filename="adapter_differntial_{epoch:02d}",
+    filename="adapter_comb_checkpoint_cont_{epoch:02d}",
     monitor="val_wer",
     mode="min",
     save_top_k=-1,
@@ -37,7 +36,8 @@ checkpoint = ModelCheckpoint(
     save_last=True
 )
 
-model = nemo_asr.models.ASRModel.restore_from(restore_path=model_path)
+model = nemo_asr.models.EncDecRNNTBPEModel.load_from_checkpoint(ckpt_path, strict=False)
+
 d_model = model.cfg.encoder.d_model
 
 # Step Params
@@ -63,14 +63,6 @@ for param in model.decoder.parameters():
 for param in model.joint.parameters():
     param.requires_grad = True
 
-print(model.summarize())
-
-trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
-total_params = sum (p.numel() for p in model.parameters())
-print("Trainable:", trainable_params, "Total", total_params)
-
-# Pass Params
-
 OmegaConf.set_struct(model.cfg, False)
 
 model.cfg.train_ds.manifest_filepath = train_path
@@ -81,12 +73,6 @@ model.cfg.train_ds.use_lhotse = False
 model.cfg.validation_ds.use_lhotse = False
 model.cfg.train_ds.num_workers = 28
 model.cfg.validation_ds.num_workers = 28
-model.cfg.optim.sched.name = "CosineAnnealing"
-model.cfg.optim.name = "adamw"
-model.cfg.optim.sched.warmup_steps = 1000
-model.cfg.optim.sched.min_lr = 0.0
-model.cfg.optim.lr = 1e-4
-model.cfg.optim.weight_decay = 1e-4
 
 if "spec_augment" in model.cfg:
     model.cfg.spec_augment.freq_masks = 2
@@ -111,12 +97,14 @@ model.cfg.train_ds.augmentor = {
 
 OmegaConf.set_struct(model.cfg, True)
 
-# Train
+ckpt = torch.load(ckpt_path, map_location="cpu", weights_only=False)
+model.load_state_dict(ckpt['state_dict'], strict=True)
 
-model.setup_optimizer_param_groups = types.MethodType(custom_params, model)
+print(model.summarize())
+
+# Train
 model.setup_training_data(train_data_config=model.cfg.train_ds)
 model.setup_validation_data(val_data_config=model.cfg.validation_ds)
-
 
 trainer = pyl.Trainer(
     devices=num_gpus,
@@ -124,10 +112,9 @@ trainer = pyl.Trainer(
     max_epochs=max_epochs,
     callbacks=[checkpoint],
     logger=tb_logger,
-    precision="bf16-mixed"
     # use_distributed_sampler=False
 )
 
-trainer.fit(model)
+trainer.fit(model, ckpt_path=ckpt_path)
 
-model.save_to("custom_adapters_differential.nemo")
+model.save_to("custom_model_adapters_comb.nemo")

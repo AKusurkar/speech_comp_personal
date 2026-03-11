@@ -231,3 +231,4 @@ __marimo__/
 lightning_logs/
 speech_comp_env/
 tb_logs/
+tokenizer_files/

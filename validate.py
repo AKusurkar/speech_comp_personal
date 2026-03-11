@@ -33,7 +33,19 @@ class ValidatePreds:
             tot_val += val
         
         return tot_val/tot_num
+    
+    def examine_str(self, inp_str):
 
+        filler_words = ["hmm", "mm", "mhm", "mmm", "uh", "um"]
+
+        inp_str_lst = inp_str.lower().strip().split(" ")
+
+        if all(i in filler_words for i in inp_str_lst):
+
+            return True   
+
+        return False
+    
     def save_to_jsonl(self, insert_dict, filename, type):
 
         with open(filename, type) as f:
@@ -43,8 +55,10 @@ class ValidatePreds:
     def val_score(self, batched_val_data):
 
         score = 0
-        long_lst = []
-        short_lst = []
+        tot_score_short = 0
+        tot_score_long = 0
+        tot_long = 0
+        tot_short = 0
 
         for j in tqdm(range(len(batched_val_data)), desc="Batch Progress"):
             
@@ -80,39 +94,49 @@ class ValidatePreds:
 
                 self.save_to_jsonl(dict_save, self.save_file, ty)
 
-                s_raw = score_wer_local(lab, pred)
-                score_batch += s_raw
-
-                if float(l) <= 1.5:
-                    score_short += s_raw
-                    num_short += 1
-                    short_lst.append((num_short, score_short))
-                else:
-                    score_long += s_raw
-                    num_long += 1
-                    long_lst.append((num_long, score_long))
-
-            score_batch = score_batch/len(batch)
-
-            if num_long == 0 or num_short == 0:
+                if self.examine_str(lab) is not True and self.examine_str(pred) is not True:
                 
-                print("Only long or short")
-            
-            else:
-                score_short = score_short/num_short
-                score_long = score_long/num_long
+                    s_raw = score_wer_local(lab, pred)
+                    score_batch += s_raw
 
-            score += score_batch
+                    if  float(l) <= 1.5:
+                        score_short += s_raw
+                        num_short += 1
 
-            print(f"Batch score: {score_batch} \n Short: {num_short}, {score_short} \n Long: {num_long}, {score_long}")
-        
+                    else:
+                        score_long += s_raw
+                        num_long += 1
+                        
+
+            if score_batch != 0:
+
+                score_batch = score_batch/len(batch)
+
+                if num_long == 0 or num_short == 0:
+                    
+                    print("Only long or short")
+                
+                else:
+                    batch_short = score_short/num_short
+                    batch_long = score_long/num_long
+
+                    tot_score_short += score_short
+                    tot_score_long += score_long
+                    tot_short += num_short
+                    tot_long += num_long
+
+                score += score_batch
+
+
+                print(f"Batch score: {score_batch} \n Short: {num_short}, {batch_short} \n Long: {num_long}, {batch_long}")
+
         score = score/len(batched_val_data)
 
-        avg_short = self.avg_lsts(short_lst)
-        avg_long = self.avg_lsts(long_lst)
+        avg_short = tot_score_short/tot_short
+        avg_long = tot_score_long/tot_long
 
-        print("Short:", avg_short)
-        print("Long:", avg_long)
+        print("Amount Short:", tot_short, "Short Score:", avg_short)
+        print("Amount Long:", tot_long, "Long Score:", avg_long)
         print("All:", score)
 
         proper_score = score_jsonl(self.save_file, self.label_loc, metric="wer")

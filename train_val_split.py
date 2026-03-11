@@ -1,12 +1,14 @@
 import json
 import pandas as pd
 from sklearn.model_selection import train_test_split
+import numpy as np
 
 class SplitData:
     
-    def __init__(self, original_train_file):
+    def __init__(self, original_train_file, save_loc):
 
         self.original_train_file = original_train_file
+        self.save_loc = save_loc
 
     def examine_str(self, inp_str):
 
@@ -41,25 +43,74 @@ class SplitData:
         return df
     
     def drop_specific_file(self, df, id):
-        #S_6438aac83bbbd772
+
         df = df[df["utterance_id"] != id]
         return df        
-    
-    def train_val_split(self, df, num_buckets):
 
-        df["dur_bin"] = pd.qcut(df["audio_duration_sec"], q=num_buckets, labels=False, duplicates="drop")
+    def train_val_split(self, df, test_size=0.2):
 
-        df["stratify_key"] = df["age_bucket"].astype(str) + "_" + df["dur_bin"].astype(str)
+        bins = [0, 0.61, 1.05, 1.89, 3.29, 6.52, 12.51, float('inf')]
+        val_proportions = [0.05, 0.20, 0.25, 0.25, 0.20, 0.04, 0.01]
 
-        train_df, val_df = train_test_split(
-            df, 
-            test_size=0.2,
-            stratify=df["stratify_key"],
-            random_state=42
-        )
+        df["dur_bin"] = pd.cut(df["audio_duration_sec"], bins=bins, labels=False, include_lowest=True)
 
-        train_df = train_df.drop(columns=["stratify_key", "dur_bin"])
-        val_df = val_df.drop(columns=["stratify_key", "dur_bin"])
+        total_val_size = int(len(df) * test_size)
+        target_counts = np.array([int(total_val_size * p) for p in val_proportions])
+        current_counts = np.zeros(len(val_proportions))
+
+        child_groups = df.groupby('child_id')
+        child_bin_counts = {}
+        
+        for child_id, group in child_groups:
+            counts = group['dur_bin'].value_counts()
+            bin_arr = np.zeros(len(val_proportions))
+            for b_idx, count in counts.items():
+                bin_arr[int(b_idx)] = count
+            child_bin_counts[child_id] = bin_arr
+
+        val_children = set()
+        available_children = list(child_bin_counts.keys())
+        
+        np.random.seed(42)
+        np.random.shuffle(available_children)
+        
+        while current_counts.sum() < total_val_size and available_children:
+
+            deficit = target_counts - current_counts
+            deficit[deficit < 0] = 0  
+
+            best_child = None
+            best_score = -float('inf')
+
+            for child in available_children:
+                counts = child_bin_counts[child]
+                
+                overflow = (current_counts + counts) - target_counts
+                overflow_penalty = np.sum(overflow[overflow > 0]) * 2 
+                
+                useful_fill = np.minimum(counts, deficit)
+                score = np.sum(useful_fill) - overflow_penalty
+
+                if score > best_score:
+                    best_score = score
+                    best_child = child
+
+            if best_child is None:
+                print("Failed to find best child")
+                break
+
+            val_children.add(best_child)
+            current_counts += child_bin_counts[best_child]
+            available_children.remove(best_child)
+
+        val_df = df[df['child_id'].isin(val_children)].copy()
+        train_df = df[~df['child_id'].isin(val_children)].copy()
+
+        train_df = train_df.drop(columns=["dur_bin"])
+        val_df = val_df.drop(columns=["dur_bin"])
+        
+        train_df = train_df.sample(frac=1, random_state=42).reset_index(drop=True)
+        val_df = val_df.sample(frac=1, random_state=42).reset_index(drop=True)
 
         return train_df, val_df
 
@@ -83,7 +134,7 @@ class SplitData:
         df = self.drop_specific_file(df, "U_b8a4e8220e65219b")
         df = self.set_max_time(df, 60)
 
-        train_df, val_df = self.train_val_split(df, 10)
+        train_df, val_df = self.train_val_split(df, 0.2)
 
         self.train_lst = train_df.to_dict(orient='records')
         self.val_lst = val_df.to_dict(orient='records')
@@ -98,14 +149,15 @@ class SplitData:
 
         self.generate_split()
 
-        self.save_to_jsonl(self.train_lst, 'train_data_comb.jsonl')
-        self.save_to_jsonl(self.val_lst, "val_data_comb.jsonl")
+        self.save_to_jsonl(self.train_lst, self.save_loc + '/train_data_comb.jsonl')
+        self.save_to_jsonl(self.val_lst, self.save_loc + "/val_data_comb.jsonl")
 
 
 if __name__ == "__main__":
  
     train_file = "/home/epochvipc1/Documents/Speech_comp_temp/data/train_word_transcripts_combined.jsonl"
-    splitter = SplitData(train_file)
+    save_loc = "/home/epochvipc1/Documents/Speech_comp_temp/dicts_combined"
+    splitter = SplitData(train_file, save_loc)
 
     print(len(splitter))
     splitter.save()
