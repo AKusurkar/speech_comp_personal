@@ -17,7 +17,8 @@ submissions/
 *.pth
 *.ckpt
 *.zip
-run_counter.txt
+*/run_counter.txt
+sp_env/
 
 
 # Byte-compiled / optimized / DLL files
