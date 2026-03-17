@@ -11,9 +11,9 @@ from loguru import logger
 import torch
 from tqdm import tqdm
 
-BATCH_SIZE = 64
+BATCH_SIZE = 8
 PROGRESS_STEP_DENOM = 100  # Update progress bar every 1 // PROGRESS_STEP_DENOM
-
+# hello th
 
 def batched(iterable, n, *, strict=False):
     # batched('ABCDEFG', 3) → ABC DEF G
@@ -34,36 +34,11 @@ def main():
 
     # Load model
     src_root = Path(__file__).parent.resolve()
-    nemo_path = src_root / "custom_model_adapters.nemo"
+    nemo_path = src_root / "model_epoch_8_for_submisison.nemo"
     logger.info(f"Loading model from: {nemo_path}")
 
-    model = nemo_asr.models.EncDecRNNTBPEModel.restore_from(nemo_path, strict=False)
-    d_model = model.cfg.encoder.d_model
-    adapter_dim = 128
+    model = nemo_asr.models.ASRModel.restore_from(nemo_path, strict=False)
 
-    for i in range(len(model.encoder.layers)):
-        original_layer = model.encoder.layers[i]
-
-        model.encoder.layers[i] = AdapterLayer(
-            original_layer=original_layer,
-            d_model=d_model,
-            adapter_dim=adapter_dim
-        )
-
-    for param in model.parameters():
-        param.requires_grad = False
-
-    # with tarfile.open(nemo_path, "r:*") as tar:
-    #     for file_name in tar.getnames():
-    #         print(f" - {file_name}")
-
-    with tarfile.open(nemo_path, "r:*") as tar:
-        tar.extract("./model_weights.ckpt", path=".")
-
-    weights = torch.load("model_weights.ckpt", map_location="cpu", weights_only=False)
-    model.load_state_dict(weights, strict=True)
-
-    os.remove("model_weights.ckpt")
     model = model.cuda()
     model.eval()
 

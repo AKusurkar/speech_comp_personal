@@ -10,15 +10,15 @@ import types
 # Setup
 
 logger_path = "/home/epochvipc1/Documents/Speech_comp_temp/tb_logs"
-logger_name = "parakeet_custom_adapter_differential"
-checkpoint_path = "/home/epochvipc1/Documents/Speech_comp_temp/model_checkpoints/custom_adapter_differential"
+logger_name = "parakeet_adap_diff_grad"
+checkpoint_path = "/home/epochvipc1/Documents/Speech_comp_temp/model_checkpoints/adap_diff_grad"
 model_path = "/home/epochvipc1/Documents/speech_comp_pieter/childrens-speech-recognition-runtime/src/assets/parakeet-tdt-0.6b-v2/parakeet-tdt-0.6b-v2.nemo"
 train_path = "/home/epochvipc1/Documents/Speech_comp_temp/dicts_combined/train_data_comb_nemo.jsonl"
 val_path = "/home/epochvipc1/Documents/Speech_comp_temp/dicts_combined/val_data_comb_nemo.jsonl"
 model_out = "/home/epochvipc1/Documents/Speech_comp_temp/models"
 max_epochs = 50
-num_gpus = 2
-batch_size = 1
+num_gpus = 1
+batch_size = 4
 adapter_dim = 128
 
 tb_logger = TensorBoardLogger(
@@ -29,7 +29,7 @@ tb_logger = TensorBoardLogger(
 checkpoint = ModelCheckpoint(
 
     dirpath=checkpoint_path,
-    filename="adapter_differntial_{epoch:02d}",
+    filename="adap_diff_grad_{epoch:02d}",
     monitor="val_wer",
     mode="min",
     save_top_k=-1,
@@ -87,6 +87,8 @@ model.cfg.optim.sched.warmup_steps = 1000
 model.cfg.optim.sched.min_lr = 0.0
 model.cfg.optim.lr = 1e-4
 model.cfg.optim.weight_decay = 1e-4
+model.cfg.encoder.activations_checkpoint_method = "block"
+model.cfg.encoder.activations_checkpoint_ratio = 1.0
 
 if "spec_augment" in model.cfg:
     model.cfg.spec_augment.freq_masks = 2
@@ -124,10 +126,11 @@ trainer = pyl.Trainer(
     max_epochs=max_epochs,
     callbacks=[checkpoint],
     logger=tb_logger,
-    precision="bf16-mixed"
-    # use_distributed_sampler=False
+    precision="bf16-mixed",
+    # use_distributed_sampler=False,
+    accumulate_grad_batches=8
 )
 
 trainer.fit(model)
 
-model.save_to("custom_adapters_differential.nemo")
+model.save_to("adapters_differential_grad.nemo")

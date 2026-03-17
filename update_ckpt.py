@@ -1,14 +1,29 @@
 import torch
 import os
+from omegaconf import OmegaConf
 
 # 1. Paths (Update these!)
-ckpt_path = "/home/epochvipc1/Documents/Speech_comp_temp/model_checkpoints/custom_model_adapter/adapter_comb_checkpoint_cont_epoch=11.ckpt"
-patched_ckpt_path = "/home/epochvipc1/Documents/Speech_comp_temp/updated_ckpt/epoch_11.ckpt"
+ckpt_path = "/home/epochvipc1/Documents/Speech_comp_temp/model_checkpoints/adap_diff_grad/adap_diff_grad_epoch=17.ckpt"
+patched_ckpt_path = "/home/epochvipc1/Documents/Speech_comp_temp/updated_ckpt/epoch_17_grad.ckpt"
 tokenizer_dir = "/home/epochvipc1/Documents/Speech_comp_temp/tokenizer_files"
 
 # 2. Load the checkpoint
 ckpt = torch.load(ckpt_path, map_location="cpu", weights_only=False)
 hp = ckpt['hyper_parameters']
+
+if 'cfg' in hp and 'encoder' in hp['cfg']:
+    if 'activations_checkpoint_method' in hp['cfg']['encoder']:
+        print("Found 'activations_checkpoint_method'. Removing")
+        OmegaConf.set_struct(hp['cfg'], False)
+        del hp['cfg']['encoder']['activations_checkpoint_method']
+        del hp['cfg']['encoder']['activations_checkpoint_ratio']
+        OmegaConf.set_struct(hp['cfg'], False)
+    else:
+        print("'activations_checkpoint_method' not found in encoder config.")
+elif 'encoder' in hp: # Just in case the config structure is slightly different
+    if 'activations_checkpoint_method' in hp['encoder']:
+        print("Found 'activations_checkpoint_method'. Removing it to fix Hydar instantiation...")
+        del hp['encoder']['activations_checkpoint_method']
 
 # 3. Locate the tokenizer configuration block
 if 'cfg' in hp and 'tokenizer' in hp['cfg']:

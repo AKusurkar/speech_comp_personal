@@ -7,7 +7,7 @@ import torch
 import tarfile
 import os
 
-nemo_path = "/home/epochvipc1/Documents/Speech_comp_temp/custom_model_adapters.nemo"
+nemo_path = "/home/epochvipc1/Documents/Speech_comp_temp/custom_adapters_grad_epoch_16.nemo"
 adapter_dim = 128
 
 model = nemo_asr.models.EncDecRNNTBPEModel.restore_from(nemo_path, strict=False)
@@ -41,12 +41,13 @@ model.eval()
 
 #Validate
 
-data_dir = "/home/epochvipc1/Documents/Speech_comp_temp/data/"
+# data_dir = "/home/epochvipc1/Documents/Speech_comp_temp/data/"
+data_dir = "/home/epochvipc1/Documents/Speech_comp_temp/data/extra_jibl_data"
 train_file = "/home/epochvipc1/Documents/Speech_comp_temp/dicts_combined/train_data_comb.jsonl"
-# val_file = "/home/epochvipc1/Documents/Speech_comp_temp/dicts_original_only/val_data.jsonl"
-val_file =  "/home/epochvipc1/Documents/Speech_comp_temp/dicts_combined/val_data_comb.jsonl"
+# val_file =  "/home/epochvipc1/Documents/Speech_comp_temp/dicts_combined/val_data_comb.jsonl"
+val_file = "/home/epochvipc1/Documents/Speech_comp_temp/data/extra_jibl_data/manifest.jsonl"
 save_preds = "/home/epochvipc1/Documents/Speech_comp_temp/save_scoring"
-batch_size = 50
+batch_size = 20
 
 data_load = DataLoader(data_dir, train_file, val_file, batch_size)
 train_data, val_data = data_load.load_data()

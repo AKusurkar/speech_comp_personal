@@ -5,11 +5,12 @@ import nemo.collections.asr as nemo_asr
 from adapter import AdapterLayer
 import torch
 
-ckpt_path = "/home/epochvipc1/Documents/Speech_comp_temp/updated_ckpt/epoch_11.ckpt"
+ckpt_path = "/home/epochvipc1/Documents/Speech_comp_temp/updated_ckpt/epoch_17_grad.ckpt"
+save_model = "custom_adapters_grad_epoch_17.nemo"
 adapter_dim = 128
 
 #Model
-model = nemo_asr.models.EncDecRNNTBPEModel.load_from_checkpoint(ckpt_path, strict=False)
+model = nemo_asr.models.EncDecRNNTBPEModel.load_from_checkpoint(ckpt_path, strict=False, )
 d_model = model.cfg.encoder.d_model
 
 for i in range(len(model.encoder.layers)):
@@ -32,5 +33,5 @@ model.eval()
 print(model.summarize())
 
 # #Save Model
-model.save_to("custom_model_adapters.nemo")
+model.save_to(save_model)
 print("Model Saved!")
